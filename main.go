@@ -1,0 +1,311 @@
+package main
+
+import (
+	"encoding/json"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"strings"
+)
+
+type Config struct {
+	StoreDir    string `json:"store_dir"`
+	OutputDir   string `json:"game_dir"`
+	ModpacksDir string `json:"modpacks_dir"`
+	APIURL      string `json:"modrinth_api_url"`
+	APIVersion  string `json:"modrinth_api_version"`
+}
+
+var ErrLoadConfig = errors.New("Failed to load config")
+
+func loadConfig(path string) (c Config, err error) {
+	cfgFile, err := os.Open(path)
+	if err != nil {
+		return c, fmt.Errorf("%w: %w", ErrLoadConfig, err)
+	}
+
+	jsonData, err := io.ReadAll(cfgFile)
+	if err != nil {
+		return c, fmt.Errorf("%w: %w", ErrLoadConfig, err)
+	}
+
+	var cfg Config
+	if err := json.Unmarshal(jsonData, &cfg); err != nil {
+		return c, fmt.Errorf("%w: %w", ErrLoadConfig, err)
+	}
+	return cfg, nil
+}
+
+var modEnvironmentSupportTags = [4]string{
+	"required",
+	"optional",
+	"unsupported",
+	"unknown",
+}
+
+func parseEnvironmentSupport(option string) ([]string, bool) {
+	tags := strings.Split(option, ",")
+
+	options := make([]string, 0, 4)
+
+	for _, v := range tags {
+		lw := strings.TrimSpace(strings.ToLower(v))
+		for _, env := range modEnvironmentSupportTags {
+			if lw == env {
+				options = append(options, env)
+			}
+		}
+	}
+	if len(options) < 1 {
+		return options, false
+	}
+	return options, true
+}
+
+// returns length of the longest string in the array
+func longestStringLength(s []string) int {
+	l := 0
+	for _, a := range s {
+		if len(a) > l {
+			l = len(a)
+		}
+	}
+	return l
+}
+
+func padRight(s string, l int) string {
+	if l == 0 {
+		return s
+	}
+	padding := l - len(s)
+	if padding < 0 {
+		return s
+	}
+	return s + strings.Repeat(" ", padding)
+}
+
+type UseCmdFlags struct {
+	crate  string
+	client string
+	server string
+	dryRun bool
+}
+
+func (u *UseCmdFlags) Run() {
+
+}
+
+func main() {
+
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt)
+
+	go func() {
+		<-done
+		clearLine()
+		showCursor()
+		os.Exit(0)
+	}()
+
+	var f flags
+	f.defineFlags()
+
+	cfg, err := loadConfig("config/config.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	flag.Usage = func() {
+		fmt.Println()
+		flag.PrintDefaults()
+	}
+
+	var useCmdFlags UseCmdFlags
+
+	useCmd := flag.NewFlagSet("use", flag.ExitOnError)
+	useCmd.StringVar(&useCmdFlags.client, "client", "all", "usage")
+	useCmd.StringVar(&useCmdFlags.server, "server", "all", "usage")
+	useCmd.StringVar(&useCmdFlags.crate, "profile", "", "usage")
+	useCmd.BoolVar(&useCmdFlags.dryRun, "dry-run", false, "usage")
+
+	flag.Parse()
+
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "use":
+			useCmd.Parse(os.Args[2:])
+			fmt.Printf("%v\n", useCmdFlags.crate)
+			fmt.Printf("%v\n", useCmdFlags.client)
+			fmt.Printf("%v\n", useCmdFlags.server)
+			fmt.Printf("%v\n", useCmdFlags.dryRun)
+		case "modpack":
+			name := os.Args[2]
+			p := os.Args[3]
+			mpath := filepath.Join(cfg.ModpacksDir, name)
+			if err := extract(p, mpath); err != nil {
+				log.Fatal(err)
+			}
+			manifest, err := readModrinthManifest(mpath)
+			if err != nil {
+				log.Fatal(err)
+			}
+			fmt.Printf("Name: %s\n", manifest.Name)
+			fmt.Printf("Version: %s\n", manifest.VersionId)
+			fmt.Printf("Summary: %s\n", manifest.Dependencies.Minecraft)
+		case "list":
+			name := os.Args[2]
+			mpath := filepath.Join(cfg.ModpacksDir, name)
+			dir, err := os.ReadDir(mpath)
+			if err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					fmt.Printf("Directory or modpack %s does not exist\n", name)
+					os.Exit(0)
+				} else {
+					log.Fatal(err)
+				}
+			}
+			fmt.Println("\n", name)
+			fmt.Println("------------------")
+			if len(dir) < 1 {
+				fmt.Println(" *empty* ")
+			}
+			for _, file := range dir {
+				fmt.Printf("* %s\n", file.Name())
+			}
+		case "dl":
+			if len(os.Args) <= 2 {
+				return
+			}
+			modpackName := os.Args[2]
+
+			modpackPath := filepath.Join(cfg.ModpacksDir, modpackName)
+			manifest, err := readModrinthManifest(modpackPath)
+			if err != nil {
+				log.Fatal(err)
+			}
+			fileCount := len(manifest.Files)
+
+			// tracking progress
+			downloadProgress := newProgress(fileCount)
+
+			// setup http httpClient
+			httpClient := newAPIClient(cfg.APIURL, cfg.APIVersion)
+
+			hideCursor()
+			fmt.Printf("\n    %s\n", modpackName)
+
+			filesDownloaded := 0
+			var totalBytes int64 = 0
+			maxLen := longestStringLength(manifest.getFiles()) // formatting
+
+			for i, file := range manifest.Files {
+				if len(file.Downloads) < 1 {
+					continue
+				}
+
+				downloadURL := file.Downloads[0]
+				destFilepath := filepath.Join(modpackPath, file.Path)
+
+				// skip existing files
+				_, err := os.Stat(destFilepath)
+				if err == nil {
+					fmt.Printf("    [SKIPPED] %s already exists\n", whiteBoldColor(file.Path))
+					continue
+				} else if !errors.Is(err, os.ErrNotExist) {
+					log.Fatal(err)
+				}
+
+				filename := filepath.Base(file.Path)
+				fmt.Printf("    Downloading %s... (%s)\r", padRight(filename, 10), downloadProgress.ratio())
+				bytesDownloaded, err := httpClient.DownloadFile(downloadURL, destFilepath)
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				// statistics
+				totalBytes += bytesDownloaded
+				filesDownloaded++
+				downloadProgress.Update(i + 1)
+
+				clearLine()
+				checkmark := "\u2713"
+				fmt.Printf("    [DOWNLOADED] %s %s\n\n", success(checkmark), padRight(filename, maxLen))
+				cursorUp(1)
+			}
+			fmt.Printf("\nDownload Complete! (%d/%d) files; Total %d bytes \n", filesDownloaded, fileCount, int(totalBytes))
+			showCursor()
+		}
+	}
+
+	if f.listmodpack != "" {
+		modpackPath := filepath.Join(cfg.ModpacksDir, f.listmodpack)
+		manifest, err := readModrinthManifest(modpackPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if !f.filter {
+			fmt.Printf("\nAll mods in %s\n\n", whiteIntenseColor(f.listmodpack))
+			files := manifest.getFiles()
+
+			builder := strings.Builder{}
+			for _, f := range files {
+				builder.WriteString("* " + f + "\n")
+			}
+			fmt.Printf("%s\n", builder.String())
+			return
+		}
+
+		if f.server != "none" {
+			if strings.ToLower(f.server) == "all" {
+				fmt.Printf("(Required | Optional) server mods")
+				files := manifest.getServerSides()
+				for _, f := range files {
+					fmt.Printf("* %s\n", f)
+				}
+			}
+			tags, ok := parseEnvironmentSupport(f.server)
+			if ok {
+				if len(tags) > 4 {
+					log.Fatal("ok thats too many tags! only 4 MAX, k?")
+				}
+				fmt.Printf("%s server mods\n", tags)
+				for _, tag := range tags {
+					files := manifest.getServerSideWithTag(tag)
+					l := longestStringLength(files)
+					for _, f := range files {
+						fmt.Printf("* %s - [%s]\n", padRight(f, l), tag)
+					}
+				}
+			}
+		}
+
+		if f.client != "none" {
+			if strings.ToLower(f.client) == "all" {
+				fmt.Printf("(Required | Optional) client mods")
+				files := manifest.getClientSides()
+				for _, f := range files {
+					fmt.Printf("* %s\n", f)
+				}
+			}
+			tags, ok := parseEnvironmentSupport(f.client)
+			if ok {
+				if len(tags) > 4 {
+					log.Fatal("ok thats too many tags! only 4 MAX, k?")
+				}
+				fmt.Printf("%s client mods\n", tags)
+				for _, tag := range tags {
+					files := manifest.getServerSideWithTag(tag)
+					l := longestStringLength(files)
+					for _, f := range files {
+						fmt.Printf("* %s - [%s]\n", padRight(f, l), tag)
+					}
+				}
+			}
+		}
+	}
+}
