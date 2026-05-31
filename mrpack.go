@@ -226,14 +226,17 @@ func readModrinthManifest(path string) (m ModrinthIndex, err error) {
 	return m, nil
 }
 
-func copyModpackFiles(srcPath string, destDir string, verbose bool) (bytesCopied int64, err error) {
+func copyDirInModpack(srcPath string, destDir string, verbose bool) (bytesCopied int64, err error) {
 	destDir = filepath.Clean(destDir)
 	srcPath, err = filepath.Abs(srcPath)
 	if err != nil {
 		return bytesCopied, err
 	}
 
-	wd, err := os.Getwd() // wd, err := os.Executable()
+	wd, err := os.Executable()
+	if os.Getenv("ENV") == "DEV" {
+		wd, err = os.Getwd()
+	}
 	if err != nil {
 		return bytesCopied, err
 	}
