@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -11,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 type Config struct {
@@ -101,16 +103,15 @@ func (u *UseCmdFlags) Run() {
 }
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt)
-
-	go func() {
-		<-done
+	go func(ctx context.Context) {
+		<-ctx.Done()
 		clearLine()
 		showCursor()
 		os.Exit(0)
-	}()
+	}(ctx)
 
 	var f flags
 	f.defineFlags()
@@ -214,15 +215,15 @@ func main() {
 				// skip existing files
 				_, err := os.Stat(destFilepath)
 				if err == nil {
-					fmt.Printf("    [SKIPPED] %s already exists\n", whiteBoldColor(file.Path))
+					fmt.Printf("[SKIPPED] %s already exists\n", whiteBoldColor(file.Path))
 					continue
 				} else if !errors.Is(err, os.ErrNotExist) {
 					log.Fatal(err)
 				}
 
 				filename := filepath.Base(file.Path)
-				fmt.Printf("    Downloading %s... (%s)\r", padRight(filename, 10), downloadProgress.ratio())
-				bytesDownloaded, err := httpClient.DownloadFile(downloadURL, destFilepath)
+				fmt.Printf("Downloading %s... (%s)\r", padRight(filename, 10), downloadProgress.ratio())
+				bytesDownloaded, err := httpClient.DownloadFile(ctx, downloadURL, destFilepath)
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -234,7 +235,7 @@ func main() {
 
 				clearLine()
 				checkmark := "\u2713"
-				fmt.Printf("    [DOWNLOADED] %s %s\n\n", success(checkmark), padRight(filename, maxLen))
+				fmt.Printf("[DOWNLOADED] %s %s\n\n", success(checkmark), padRight(filename, maxLen))
 				cursorUp(1)
 			}
 			fmt.Printf("\nDownload Complete! (%d/%d) files; Total %d bytes \n", filesDownloaded, fileCount, int(totalBytes))

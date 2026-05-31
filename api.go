@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,11 +44,8 @@ func (a *APIClient) VersionedAPIURL() string {
 	return fmt.Sprintf("%s/%s", a.APIHost, a.APIVersion)
 }
 
-// 8 Char Base62 Alphanumeric ID
-var projectIdRegex, _ = regexp.Compile("^[a-zA-Z0-9]{8}$")
-
-func (a *APIClient) DownloadFile(url string, dest string) (b int64, err error) {
-	req, err := http.NewRequest("GET", url, nil)
+func (a *APIClient) DownloadFile(ctx context.Context, url string, dest string) (b int64, err error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return b, err
 	}
@@ -76,10 +74,11 @@ func (a *APIClient) DownloadFile(url string, dest string) (b int64, err error) {
 		return b, err
 	}
 
-	//time.Sleep(time.Second)
-
 	return b, nil
 }
+
+// 8 Char Base62 Alphanumeric ID
+var projectIdRegex, _ = regexp.Compile("^[a-zA-Z0-9]{8}$")
 
 // returns information about a project on modrinth with a project id
 func (a *APIClient) GetProject(projectId string) (p Project, e error) {
