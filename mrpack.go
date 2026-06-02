@@ -24,6 +24,15 @@ const (
 
 type EnvSupport string
 
+func (e EnvSupport) isValid() bool {
+	switch e {
+	case Required, Optional, Unsupported, Unknown:
+		return true
+	default:
+		return false
+	}
+}
+
 const (
 	Required    EnvSupport = "required"
 	Optional    EnvSupport = "optional"
