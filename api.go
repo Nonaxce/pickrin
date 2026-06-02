@@ -15,11 +15,7 @@ import (
 )
 
 func createUserAgent(projectName, version string) string {
-	// This retrieves golangs env, which is very likely but not always the env of the device
 	osName := runtime.GOOS
-	if osName == "windows" {
-		//osName = "Windows NT" // everything windows
-	}
 	archName := runtime.GOARCH
 
 	return fmt.Sprintf("%s/%s (%s; %s)", projectName, version, osName, archName)
