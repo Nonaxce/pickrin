@@ -45,7 +45,7 @@ func loadConfig(path string) (c Config, err error) {
 
 const MaxEnvSupportOptions = 4
 
-func parseEnvironmentSupport(option string) ([]string, bool) {
+func parseEnvSupportList(option string) ([]string, bool) {
 	tags := strings.Split(option, ",")
 	options := make([]string, 0, MaxEnvSupportOptions)
 
@@ -293,7 +293,7 @@ func main() {
 					fmt.Printf("* %s\n", f)
 				}
 			}
-			tags, ok := parseEnvironmentSupport(f.server)
+			tags, ok := parseEnvSupportList(f.server)
 			if ok {
 				if len(tags) > 4 {
 					log.Fatal("ok thats too many tags! only 4 MAX, k?")
@@ -321,7 +321,7 @@ func main() {
 					fmt.Printf("* %s\n", f)
 				}
 			}
-			tags, ok := parseEnvironmentSupport(f.client)
+			tags, ok := parseEnvSupportList(f.client)
 			if ok {
 				if len(tags) > 4 {
 					log.Fatal("ok thats too many tags! only 4 MAX, k?")
