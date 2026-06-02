@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"time"
 )
 
 func createUserAgent(projectName, version string) string {
@@ -33,7 +34,12 @@ type APIClient struct {
 
 func newAPIClient(apiURL, apiVersion string) *APIClient {
 	return &APIClient{
-		client:     http.Client{},
+		client: http.Client{
+			Transport: &http.Transport{
+				IdleConnTimeout:       time.Minute * 30,
+				ResponseHeaderTimeout: time.Second * 10,
+			},
+		},
 		userAgent:  createUserAgent("modpickrin", "0.1.0"),
 		APIHost:    apiURL,
 		APIVersion: apiVersion,
