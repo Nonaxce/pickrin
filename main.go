@@ -55,12 +55,10 @@ func parseEnvironmentSupport(option string) ([]string, bool) {
 
 	options := make([]string, 0, 4)
 
-	for _, v := range tags {
-		lw := strings.TrimSpace(strings.ToLower(v))
-		for _, env := range modEnvironmentSupportTags {
-			if lw == env {
-				options = append(options, env)
-			}
+	for _, tag := range tags {
+		tag := strings.TrimSpace(strings.ToLower(tag))
+		if EnvSupport(tag).isValid() {
+			options = append(options, tag)
 		}
 	}
 	if len(options) < 1 {
