@@ -276,7 +276,7 @@ func main() {
 				}
 				fmt.Printf("%s server mods\n", tags)
 				for _, tag := range tags {
-					files := manifest.getServerSideWithTag(tag)
+					files := manifest.getServerSideWithTag(EnvSupport(tag))
 					l := longestStringLength(files)
 					for _, f := range files {
 						fmt.Printf("* %s - [%s]\n", padRight(f, l), tag)
@@ -300,7 +300,7 @@ func main() {
 				}
 				fmt.Printf("%s client mods\n", tags)
 				for _, tag := range tags {
-					files := manifest.getServerSideWithTag(tag)
+					files := manifest.getServerSideWithTag(EnvSupport(tag))
 					l := longestStringLength(files)
 					for _, f := range files {
 						fmt.Printf("* %s - [%s]\n", padRight(f, l), tag)

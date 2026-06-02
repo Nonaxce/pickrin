@@ -43,8 +43,8 @@ type ModpackFile struct {
 	FileSize  float64  `json:"fileSize"`
 
 	Env struct {
-		Client string `json:"client"`
-		Server string `json:"server"`
+		Client EnvSupport `json:"client"`
+		Server EnvSupport `json:"server"`
 	} `json:"env"`
 }
 
@@ -66,7 +66,7 @@ type ModrinthIndex struct {
 	Files []ModpackFile `json:"files"`
 }
 
-func (m *ModrinthIndex) getClientSideWithTag(tag string) []string {
+func (m *ModrinthIndex) getClientSideWithTag(tag EnvSupport) []string {
 	filteredMods := make([]string, 0, len(m.Files)/2)
 	for _, file := range m.Files {
 		if file.Env.Client == tag {
@@ -76,7 +76,7 @@ func (m *ModrinthIndex) getClientSideWithTag(tag string) []string {
 	return filteredMods
 }
 
-func (m *ModrinthIndex) getServerSideWithTag(tag string) []string {
+func (m *ModrinthIndex) getServerSideWithTag(tag EnvSupport) []string {
 	filteredMods := make([]string, 0, len(m.Files)/2)
 	for _, file := range m.Files {
 		if file.Env.Server == tag {

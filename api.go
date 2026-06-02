@@ -84,7 +84,6 @@ var projectIdRegex, _ = regexp.Compile("^[a-zA-Z0-9]{8}$")
 
 // returns information about a project on modrinth with a project id
 func (a *APIClient) GetProject(projectId string) (p Project, e error) {
-	// validate project id input
 	if ok := projectIdRegex.MatchString(projectId); !ok {
 		return p, errors.New("Invalid string for project id")
 	}
