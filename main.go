@@ -155,15 +155,16 @@ func main() {
 				}
 
 				modpackSubDir := filepath.Join(modpackPath, subDir)
+				// join sub directory since function copies over the files not the directory
 				outputDir := filepath.Join(cfg.OutputDir, subDir)
-				_, err := copyDirInModpack(modpackSubDir, outputDir, true)
+				_, err := copyFilesInDir(modpackSubDir, outputDir, true)
 				if err != nil {
 					log.Fatal(err)
 				}
 			}
 			if hasOverrides {
 				overridesDir := filepath.Join(modpackPath, OverridesDirName)
-				_, err := copyDirInModpack(overridesDir, cfg.OutputDir, true)
+				_, err := copyFilesInDir(overridesDir, cfg.OutputDir, true)
 				if err != nil {
 					log.Fatal(err)
 				}

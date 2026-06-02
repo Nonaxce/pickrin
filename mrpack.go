@@ -233,7 +233,7 @@ func readModrinthManifest(path string) (m ModrinthIndex, err error) {
 	return m, nil
 }
 
-func copyDirInModpack(srcPath string, destDir string, verbose bool) (bytesCopied int64, err error) {
+func copyFilesInDir(srcPath string, destDir string, verbose bool) (bytesCopied int64, err error) {
 	destDir = filepath.Clean(destDir)
 	srcPath, err = filepath.Abs(srcPath)
 	if err != nil {
