@@ -102,6 +102,8 @@ func (u *UseCmdFlags) Run() {
 
 }
 
+const OverridesDirName = "overrides"
+
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -139,11 +141,41 @@ func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "use":
-			useCmd.Parse(os.Args[2:])
-			fmt.Printf("%v\n", useCmdFlags.crate)
-			fmt.Printf("%v\n", useCmdFlags.client)
-			fmt.Printf("%v\n", useCmdFlags.server)
-			fmt.Printf("%v\n", useCmdFlags.dryRun)
+			if len(os.Args) <= 2 {
+				return
+			}
+
+			modpackName := os.Args[2]
+			modpackPath := filepath.Join(cfg.ModpacksDir, modpackName)
+			dir, err := os.ReadDir(modpackPath)
+			if err != nil {
+				log.Fatal(err)
+			}
+			hasOverrides := false
+			for _, f := range dir {
+				if !f.IsDir() {
+					continue // files should be placed in overrides directory
+				}
+				subDir := f.Name()
+				if subDir == OverridesDirName {
+					hasOverrides = true
+					continue // overrides are copied last
+				}
+
+				modpackSubDir := filepath.Join(modpackPath, subDir)
+				outputDir := filepath.Join(cfg.OutputDir, subDir)
+				_, err := copyDirInModpack(modpackSubDir, outputDir, true)
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+			if hasOverrides {
+				overridesDir := filepath.Join(modpackPath, OverridesDirName)
+				_, err := copyDirInModpack(overridesDir, cfg.OutputDir, true)
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
 		case "modpack":
 			name := os.Args[2]
 			p := os.Args[3]

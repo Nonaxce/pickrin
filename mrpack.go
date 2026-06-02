@@ -13,8 +13,6 @@ import (
 	"strings"
 )
 
-//var hasherSHA256 = crypto.Hash(crypto.SHA256).New()
-
 type Env string
 
 const (
@@ -79,7 +77,7 @@ func (m *ModrinthIndex) getClientSideWithTag(tag EnvSupport) []string {
 	filteredMods := make([]string, 0, len(m.Files)/2)
 	for _, file := range m.Files {
 		if file.Env.Client == tag {
-			filteredMods = append(filteredMods, filepath.Base(file.Path))
+			filteredMods = append(filteredMods, file.Path)
 		}
 	}
 	return filteredMods
@@ -116,11 +114,11 @@ func (m *ModrinthIndex) getClientSides() []string {
 }
 
 func (m *ModrinthIndex) getFiles() []string {
-	filteredMods := make([]string, 0, len(m.Files))
+	files := make([]string, 0, len(m.Files))
 	for _, file := range m.Files {
-		filteredMods = append(filteredMods, filepath.Base(file.Path))
+		files = append(files, file.Path)
 	}
-	return filteredMods
+	return files
 }
 
 // extracts a zip archive like .mrpack to a destination
