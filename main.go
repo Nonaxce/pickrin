@@ -43,17 +43,11 @@ func loadConfig(path string) (c Config, err error) {
 	return cfg, nil
 }
 
-var modEnvironmentSupportTags = [4]string{
-	"required",
-	"optional",
-	"unsupported",
-	"unknown",
-}
+const MaxEnvSupportOptions = 4
 
 func parseEnvironmentSupport(option string) ([]string, bool) {
 	tags := strings.Split(option, ",")
-
-	options := make([]string, 0, 4)
+	options := make([]string, 0, MaxEnvSupportOptions)
 
 	for _, tag := range tags {
 		tag := strings.TrimSpace(strings.ToLower(tag))
